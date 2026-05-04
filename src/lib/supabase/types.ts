@@ -15,14 +15,16 @@ export interface Database {
           display_name: string | null
           email: string
           subscription_tier: 'free' | 'elite'
+          subscription_expires_at: string | null
           is_admin: boolean
           created_at: string
         }
         Insert: {
-          id: string
+          id?: string
           display_name?: string | null
           email: string
           subscription_tier?: 'free' | 'elite'
+          subscription_expires_at?: string | null
           is_admin?: boolean
           created_at?: string
         }
@@ -31,6 +33,7 @@ export interface Database {
           display_name?: string | null
           email?: string
           subscription_tier?: 'free' | 'elite'
+          subscription_expires_at?: string | null
           is_admin?: boolean
           created_at?: string
         }

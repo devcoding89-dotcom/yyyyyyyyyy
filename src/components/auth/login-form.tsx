@@ -71,8 +71,17 @@ export function LoginForm() {
       let description = "Invalid email or password. Please try again.";
       const maybeMessage = typeof error?.message === "string" ? error.message : null;
 
-      // Supabase errors won’t use Firebase codes, so fall back to message when present.
-      if (maybeMessage) description = maybeMessage;
+      if (maybeMessage) {
+        const lowercase = maybeMessage.toLowerCase();
+        if (lowercase.includes("verify") || lowercase.includes("confirm")) {
+          description =
+            "Please verify your email address first. Check your inbox for the verification link.";
+        } else if (lowercase.includes("invalid login credentials") || lowercase.includes("invalid email or password")) {
+          description = "Invalid email or password. Please try again.";
+        } else {
+          description = maybeMessage;
+        }
+      }
 
       toast({
         variant: "destructive",

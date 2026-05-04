@@ -20,8 +20,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useUser } from "@/lib/supabase/provider";
+import { useDoc } from "@/hooks/use-supabase-doc";
+import { useMemoSupabaseDoc } from "@/hooks/use-memo-supabase";
+import { supabase } from "@/lib/supabase/client";
 import { ChevronLeft, Save, Loader2, Sparkles, Wand2 } from "lucide-react";
 import Link from "next/link";
 import PageHeader from "@/components/page-header";
@@ -61,15 +63,14 @@ export function TemplateForm({ templateId }: { templateId?: string }) {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useUser();
-  const db = useFirestore();
   const [isSaving, setIsSaving] = useState(false);
 
-  const templateRef = useMemoFirebase(() => {
-    if (!db || !user || !templateId) return null;
-    return doc(db, "users", user.uid, "templates", templateId);
-  }, [db, user, templateId]);
+  const templateQuery = useMemoSupabaseDoc({
+    tableName: 'templates',
+    docId: templateId || '',
+  }, [templateId]);
 
-  const { data: templateData, loading: templateLoading } = useDoc(templateRef);
+  const { data: templateData, isLoading: templateLoading } = useDoc(templateQuery);
 
   const form = useForm<TemplateFormData>({
     resolver: zodResolver(templateSchema),
@@ -101,21 +102,33 @@ export function TemplateForm({ templateId }: { templateId?: string }) {
   };
 
   async function onSubmit(values: TemplateFormData) {
-    if (!db || !user) return;
+    if (!user) return;
     
     setIsSaving(true);
     const id = templateId || crypto.randomUUID();
-    const docRef = doc(db, "users", user.uid, "templates", id);
 
     const data = {
       ...values,
       id: id,
+      userId: user.id,
       updatedAt: new Date().toISOString(),
       createdAt: templateData?.createdAt || new Date().toISOString(),
     };
 
     try {
-      await setDoc(docRef, data, { merge: true });
+      if (templateId) {
+        // Update existing template
+        const { error } = await supabase
+          .from('templates')
+          .update(data)
+          .eq('id', templateId)
+          .eq('userId', user.id);
+        if (error) throw error;
+      } else {
+        // Insert new template
+        const { error } = await supabase.from('templates').insert(data);
+        if (error) throw error;
+      }
       toast({ title: templateId ? "Template Updated" : "Template Saved" });
       router.push("/templates");
     } catch (e) {

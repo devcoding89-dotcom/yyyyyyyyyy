@@ -12,38 +12,42 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Bar, BarChart, XAxis, YAxis, Cell, Line, LineChart, ResponsiveContainer } from "recharts";
-import { useFirestore, useUser, useCollection, useMemoFirebase, useDoc } from "@/firebase";
-import { collection, query, orderBy, limit, doc } from "firebase/firestore";
+import { useUser } from "@/lib/supabase/provider";
+import { useCollection } from "@/hooks/use-supabase-collection";
+import { useDoc } from "@/hooks/use-supabase-doc";
+import { useMemoSupabaseCollection, useMemoSupabaseDoc } from "@/hooks/use-memo-supabase";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
 export default function DashboardPage() {
-  const { user, isUserLoading } = useUser();
-  const db = useFirestore();
+  const { user, isLoading: isUserLoading } = useUser();
 
-  const userProfileRef = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return doc(db, "users", user.uid);
-  }, [db, user]);
+  const userProfileQuery = useMemoSupabaseDoc({
+    tableName: 'users',
+    docId: user?.id || '',
+  }, [user]);
 
-  const { data: profile } = useDoc(userProfileRef);
+  const { data: profile } = useDoc(userProfileQuery);
 
-  const parsesQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, "users", user.uid, "parses"), orderBy("createdAt", "desc"), limit(5));
-  }, [db, user]);
+  const parsesQuery = useMemoSupabaseCollection({
+    tableName: 'parses',
+    filters: user ? [{ column: 'userId', operator: 'eq', value: user.id }] : [],
+    orderBy: { column: 'createdAt', ascending: false },
+    limit: 5,
+  }, [user]);
 
-  const campaignsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, "users", user.uid, "campaigns"), orderBy("updatedAt", "desc"));
-  }, [db, user]);
+  const campaignsQuery = useMemoSupabaseCollection({
+    tableName: 'campaigns',
+    filters: user ? [{ column: 'userId', operator: 'eq', value: user.id }] : [],
+    orderBy: { column: 'updatedAt', ascending: false },
+  }, [user]);
 
-  const contactsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, "users", user.uid, "contacts"));
-  }, [db, user]);
+  const contactsQuery = useMemoSupabaseCollection({
+    tableName: 'contacts',
+    filters: user ? [{ column: 'userId', operator: 'eq', value: user.id }] : [],
+  }, [user]);
 
   const { data: parses, isLoading: parsesLoading } = useCollection(parsesQuery);
   const { data: campaigns, isLoading: campaignsLoading } = useCollection(campaignsQuery);
@@ -95,7 +99,14 @@ export default function DashboardPage() {
     );
   }
 
-  const isElite = profile?.subscriptionTier === "elite";
+  const subscriptionExpiresAt = profile?.subscription_expires_at || profile?.subscriptionExpiresAt;
+  const isElite =
+    profile?.subscriptionTier === "elite" &&
+    (!subscriptionExpiresAt || new Date(subscriptionExpiresAt) > new Date());
+  const isExpired =
+    profile?.subscriptionTier === "elite" &&
+    subscriptionExpiresAt &&
+    new Date(subscriptionExpiresAt) <= new Date();
 
   return (
     <div className="container mx-auto py-4 sm:py-8 max-w-7xl px-4 sm:px-6">
@@ -105,13 +116,19 @@ export default function DashboardPage() {
           description={`Welcome back, ${user?.displayName || 'User'}. Tracking ${campaigns?.length || 0} active campaigns.`}
           className="mb-0"
         />
-        {!isElite && (
+        {isExpired ? (
+          <Button variant="destructive" className="w-full sm:w-auto" asChild>
+             <Link href="/pricing">
+               <Sparkles className="mr-2 h-4 w-4" /> Renew subscription
+             </Link>
+          </Button>
+        ) : !isElite ? (
           <Button variant="outline" className="w-full sm:w-auto border-amber-500 text-amber-600 hover:bg-amber-50" asChild>
              <Link href="/pricing">
                <Sparkles className="mr-2 h-4 w-4" /> Upgrade to Elite
              </Link>
           </Button>
-        )}
+        ) : null}
       </div>
       
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-8">

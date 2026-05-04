@@ -78,5 +78,6 @@ export interface UserProfile {
   email: string;
   isAdmin?: boolean;
   subscriptionTier: SubscriptionTier;
+  subscriptionExpiresAt?: string;
   createdAt: string;
 }

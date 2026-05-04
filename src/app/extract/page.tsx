@@ -65,8 +65,10 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGlobalLoading } from "@/hooks/use-global-loading";
-import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, addDoc, deleteDoc, query, orderBy, serverTimestamp, writeBatch } from "firebase/firestore";
+import { useUser } from "@/lib/supabase/provider";
+import { useCollection } from "@/hooks/use-supabase-collection";
+import { useMemoSupabaseCollection } from "@/hooks/use-memo-supabase";
+import { supabase } from "@/lib/supabase/client";
 import type { Contact } from "@/lib/types";
 import { formatDistanceToNow, isToday, isWithinInterval, subDays, subMonths } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -80,7 +82,6 @@ export default function ExtractPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useUser();
-  const db = useFirestore();
   const [text, setText] = useState("");
   const [snapshotTitle, setSnapshotTitle] = useState("");
   const { setIsLoading } = useGlobalLoading();
@@ -88,15 +89,13 @@ export default function ExtractPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
 
-  const parsesQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(
-      collection(db, "users", user.uid, "parses"),
-      orderBy("createdAt", "desc")
-    );
-  }, [db, user]);
+  const parsesQuery = useMemoSupabaseCollection({
+    tableName: 'parses',
+    filters: user ? [{ column: 'userId', operator: 'eq', value: user.id }] : [],
+    orderBy: { column: 'createdAt', ascending: false },
+  }, [user]);
 
-  const { data: parses, loading: parsesLoading } = useCollection(parsesQuery);
+  const { data: parses, isLoading: parsesLoading } = useCollection(parsesQuery);
 
   const [state, formAction, isPending] = useActionState<
     ExtractedState,
@@ -163,20 +162,25 @@ export default function ExtractPage() {
     link.click();
   };
 
-  const handleSaveSnapshot = () => {
-    if (!state?.contacts || state.contacts.length === 0 || !db || !user) return;
+  const handleSaveSnapshot = async () => {
+    if (!state?.contacts || state.contacts.length === 0 || !user) return;
     
     const parseData = {
       title: snapshotTitle || `Extraction ${new Date().toLocaleString()}`,
       text: text,
       emails: state.contacts.map(c => c.email),
       contacts: state.contacts,
-      createdAt: serverTimestamp(),
+      userId: user.id,
+      createdAt: new Date().toISOString(),
     };
 
-    addDoc(collection(db, "users", user.uid, "parses"), parseData);
-    setSnapshotTitle("");
-    toast({ title: "Snapshot Saved" });
+    const { error } = await supabase.from('parses').insert(parseData);
+    if (error) {
+      toast({ title: "Error saving snapshot", description: error.message });
+    } else {
+      setSnapshotTitle("");
+      toast({ title: "Snapshot Saved" });
+    }
   };
 
   const handleLoadSnapshot = (snapshot: any) => {
@@ -185,48 +189,42 @@ export default function ExtractPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDeleteSnapshot = (id: string) => {
-    if (!db || !user) return;
-    deleteDoc(doc(db, "users", user.uid, "parses", id));
-    toast({ title: "Snapshot Deleted" });
+  const handleDeleteSnapshot = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('parses')
+      .delete()
+      .eq('id', id)
+      .eq('userId', user.id);
+    if (error) {
+      toast({ title: "Error deleting snapshot", description: error.message });
+    } else {
+      toast({ title: "Snapshot Deleted" });
+    }
   };
 
   const handleCreateCampaign = async () => {
-    if (!state?.contacts || state.contacts.length === 0 || !db || !user) return;
+    if (!state?.contacts || state.contacts.length === 0 || !user) return;
 
     setIsLoading(true);
     try {
-      const listName = `Extracted List - ${new Date().toLocaleDateString()}`;
-      const batch = writeBatch(db);
-      
-      const newContactIds: string[] = [];
-      for (const c of state.contacts) {
-        const contactRef = doc(collection(db, "users", user.uid, "contacts"));
-        batch.set(contactRef, {
-          ...c,
-          userId: user.uid,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          isValid: true,
-        });
-        newContactIds.push(contactRef.id);
-      }
-
-      const listRef = doc(collection(db, "users", user.uid, "contactLists"));
-      batch.set(listRef, {
-        name: listName,
-        userId: user.uid,
-        contactIds: newContactIds,
+      const contactsToInsert = state.contacts.map(c => ({
+        ...c,
+        userId: user.id,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      });
+        isValid: true,
+      }));
 
-      await batch.commit();
-
-      toast({ title: "Contact List Created", description: `"${listName}" added to library.` });
-      router.push("/campaigns/new");
+      const { error } = await supabase.from('contacts').insert(contactsToInsert);
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+      } else {
+        toast({ title: "Contacts Added", description: "Contacts added to your library." });
+        router.push("/campaigns/new");
+      }
     } catch (e) {
-      toast({ variant: "destructive", title: "Error", description: "Failed to initialize campaign." });
+      toast({ variant: "destructive", title: "Error", description: "Failed to add contacts." });
     } finally {
       setIsLoading(false);
     }

@@ -14,6 +14,10 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 export const metadata: Metadata = {
   title: "EmailCraft Studio | AI-Powered Outreach",
   description: "Craft and dispatch your email campaigns with AI assistance. Extract, verify, and personalize at scale.",
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+  },
 };
 
 export default function RootLayout({

@@ -5,8 +5,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Loader2, FileText, Trash2, Edit, Copy } from "lucide-react";
 import PageHeader from "@/components/page-header";
-import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, doc, deleteDoc, addDoc } from "firebase/firestore";
+import { useUser } from "@/lib/supabase/provider";
+import { useCollection } from "@/hooks/use-supabase-collection";
+import { useMemoSupabaseCollection } from "@/hooks/use-memo-supabase";
+import { supabase } from "@/lib/supabase/client";
 import { 
   Card, 
   CardHeader, 
@@ -30,40 +32,50 @@ import {
 
 export default function TemplatesPage() {
   const { user } = useUser();
-  const db = useFirestore();
   const { toast } = useToast();
 
-  const templatesQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(
-      collection(db, "users", user.uid, "templates"),
-      orderBy("createdAt", "desc")
-    );
-  }, [db, user]);
+  const templatesQuery = useMemoSupabaseCollection({
+    tableName: 'templates',
+    filters: user ? [{ column: 'userId', operator: 'eq', value: user.id }] : [],
+    orderBy: { column: 'createdAt', ascending: false },
+  }, [user]);
 
-  const { data: templates, loading } = useCollection<any>(templatesQuery);
+  const { data: templates, isLoading: loading } = useCollection<any>(templatesQuery);
 
   const handleDelete = async (id: string) => {
-    if (!db || !user) return;
+    if (!user) return;
     try {
-      await deleteDoc(doc(db, "users", user.uid, "templates", id));
-      toast({ title: "Template Deleted" });
+      const { error } = await supabase
+        .from('templates')
+        .delete()
+        .eq('id', id)
+        .eq('userId', user.id);
+      if (error) {
+        toast({ title: "Error", description: error.message });
+      } else {
+        toast({ title: "Template deleted" });
+      }
     } catch (e) {
-      toast({ variant: "destructive", title: "Error", description: "Could not delete template." });
+      toast({ title: "Error", description: "Failed to delete template" });
     }
   };
 
   const handleDuplicate = async (template: any) => {
-    if (!db || !user) return;
+    if (!user) return;
     const { id, ...data } = template;
     try {
-      await addDoc(collection(db, "users", user.uid, "templates"), {
+      const { error } = await supabase.from('templates').insert({
         ...data,
+        userId: user.id,
         name: `${data.name} (Copy)`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      toast({ title: "Template Duplicated" });
+      if (error) {
+        toast({ title: "Error", description: error.message });
+      } else {
+        toast({ title: "Template Duplicated" });
+      }
     } catch (e) {
       toast({ variant: "destructive", title: "Error", description: "Could not duplicate template." });
     }

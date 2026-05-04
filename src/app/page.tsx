@@ -23,7 +23,7 @@ import {
   Cpu,
   MousePointerClick
 } from "lucide-react";
-import { useUser } from "@/firebase";
+import { useUser } from "@/lib/supabase/provider";
 import { useRouter } from "next/navigation";
 import { 
   Accordion, 

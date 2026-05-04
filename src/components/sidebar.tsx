@@ -18,33 +18,35 @@ import {
   ShieldCheck,
   FileText,
   CreditCard,
-  Home
+  Home,
+  Mail,
 } from "lucide-react";
 import { Icons } from "@/components/icons";
 import { cn } from "@/lib/utils";
-import { useDoc, useUser, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useUser } from "@/lib/supabase/provider";
+import { useDoc } from "@/hooks/use-supabase-doc";
+import { useMemoSupabaseDoc } from "@/hooks/use-memo-supabase";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/extract", label: "Extract Intelligence", icon: Mailbox },
   { href: "/contacts", label: "Contact Lists", icon: Users },
+  { href: "/send", label: "Send Emails", icon: Mail },
   { href: "/templates", label: "Email Templates", icon: FileText },
   { href: "/campaigns", label: "Campaign Builder", icon: Send },
-  { href: "/pricing", label: "Elite Pricing", icon: CreditCard },
+  { href: "/pricing", label: "Pricing", icon: CreditCard },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
-  const db = useFirestore();
 
-  const userProfileRef = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return doc(db, "users", user.uid);
-  }, [db, user]);
+  const userProfileQuery = useMemoSupabaseDoc({
+    tableName: 'users',
+    docId: user?.id || '',
+  }, [user]);
 
-  const { data: profile } = useDoc(userProfileRef);
+  const { data: profile } = useDoc(userProfileQuery);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">

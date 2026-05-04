@@ -12,6 +12,7 @@ import { useGlobalLoading } from '@/hooks/use-global-loading';
 import { cn } from '@/lib/utils';
 import { UserNav } from './user-nav';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { usePaymentGuard } from '@/hooks/use-payment-guard';
 
 const PUBLIC_PATHS = ['/', '/login', '/signup', '/forgot-password', '/pricing'];
 
@@ -21,6 +22,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   
   // Enforce authentication on private routes
   useAuthGuard();
+  usePaymentGuard();
 
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
 
@@ -63,7 +65,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-muted/40 font-body">
+    <div className="flex min-h-screen w-full flex-col overflow-x-hidden bg-muted/40 font-body">
       <Sidebar />
       <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">

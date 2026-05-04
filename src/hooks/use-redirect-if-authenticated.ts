@@ -2,15 +2,15 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/firebase';
+import { useUser } from '@/lib/supabase/provider';
 
 export function useRedirectIfAuthenticated(redirectPath: string = '/') {
-  const { user, isUserLoading } = useUser();
+  const { user, isLoading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isUserLoading && user) {
+    if (!isLoading && user) {
       router.push(redirectPath);
     }
-  }, [user, isUserLoading, router, redirectPath]);
+  }, [user, isLoading, router, redirectPath]);
 }

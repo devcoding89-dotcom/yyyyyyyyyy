@@ -5,38 +5,34 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Loader2 } from "lucide-react";
 import PageHeader from "@/components/page-header";
-import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, doc, deleteDoc } from "firebase/firestore";
-import { errorEmitter } from "@/firebase/error-emitter";
-import { FirestorePermissionError } from "@/firebase/errors";
+import { useUser } from "@/lib/supabase/provider";
+import { useCollection } from "@/hooks/use-supabase-collection";
+import { useMemoSupabaseCollection } from "@/hooks/use-memo-supabase";
+import { supabase } from "@/lib/supabase/client";
 import { CampaignCard } from "./components/campaign-card";
 import type { Campaign } from "@/lib/types";
 
 export default function CampaignsPage() {
   const { user } = useUser();
-  const db = useFirestore();
 
-  const campaignsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(
-      collection(db, "users", user.uid, "campaigns"), 
-      orderBy("createdAt", "desc")
-    );
-  }, [db, user]);
+  const campaignsQuery = useMemoSupabaseCollection({
+    tableName: 'campaigns',
+    filters: user ? [{ column: 'userId', operator: 'eq', value: user.id }] : [],
+    orderBy: { column: 'createdAt', ascending: false },
+  }, [user]);
 
-  const { data: campaigns, loading } = useCollection<Campaign>(campaignsQuery);
+  const { data: campaigns, isLoading: loading } = useCollection<Campaign>(campaignsQuery);
 
-  const handleDelete = (id: string) => {
-    if (!db || !user) return;
-    const docRef = doc(db, "users", user.uid, "campaigns", id);
-    
-    deleteDoc(docRef).catch(async () => {
-      const permissionError = new FirestorePermissionError({
-        path: docRef.path,
-        operation: "delete",
-      });
-      errorEmitter.emit("permission-error", permissionError);
-    });
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('campaigns')
+      .delete()
+      .eq('id', id)
+      .eq('userId', user.id);
+    if (error) {
+      console.error('Error deleting campaign:', error);
+    }
   };
 
   return (

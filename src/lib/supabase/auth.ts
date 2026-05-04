@@ -1,7 +1,6 @@
 'use client';
 
 import { supabase } from '@/lib/supabase/client';
-import { errorEmitter } from '@/firebase/error-emitter';
 import type { SupabaseAuthError } from '@supabase/supabase-js';
 
 export interface AuthUser {
@@ -15,15 +14,14 @@ export async function signUp(data: any) {
 
   try {
     // Create auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
+    const { data: authData, error: authError } = await supabase.auth.signUp(
+      { email, password },
+      {
         data: {
           display_name: displayName,
         },
-      },
-    });
+      }
+    );
 
     if (authError) {
       throw authError;
@@ -41,9 +39,10 @@ export async function signUp(data: any) {
       .insert([
         {
           id: user.id,
-          email: user.email,
+          email: user.email!,
           display_name: displayName,
           subscription_tier: 'free',
+          subscription_expires_at: null,
           is_admin: false,
           created_at: new Date().toISOString(),
         },
