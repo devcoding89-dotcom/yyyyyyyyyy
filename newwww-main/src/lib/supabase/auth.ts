@@ -1,8 +1,6 @@
 'use client';
 
 import { supabase } from '@/lib/supabase/client';
-import { errorEmitter } from '@/firebase/error-emitter';
-import type { SupabaseAuthError } from '@supabase/supabase-js';
 
 export interface AuthUser {
   id: string;
@@ -62,9 +60,6 @@ export async function signUp(data: any) {
     await supabase.auth.resend({
       type: 'signup',
       email,
-      options: {
-        shouldCreateUser: false,
-      },
     }).catch(err => {
       console.warn('Failed to send verification email:', err);
     });
