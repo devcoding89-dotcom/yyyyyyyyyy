@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Mail, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "dummy-anon-key";
+
+async function createSupabaseClient() {
+  const { createBrowserClient } = await import("@supabase/ssr");
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+}
 
 export default function EmailVerificationPage() {
   const router = useRouter();
@@ -19,6 +26,7 @@ export default function EmailVerificationPage() {
   useEffect(() => {
     // Check if user is already verified
     const checkAuth = async () => {
+      const supabase = await createSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.email_confirmed_at) {
         router.push("/dashboard");
@@ -35,6 +43,7 @@ export default function EmailVerificationPage() {
     setResendMessage("");
 
     try {
+      const supabase = await createSupabaseClient();
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email,
