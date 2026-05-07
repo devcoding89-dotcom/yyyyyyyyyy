@@ -12,16 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckCircle, Mail, ArrowRight } from "lucide-react";
-
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co";
-const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "dummy-anon-key";
-
-async function createSupabaseClient() {
-  const { createBrowserClient } = await import("@supabase/ssr");
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
-}
+import { supabase } from "@/lib/supabase/client";
 
 export default function VerifyEmailContent() {
   const router = useRouter();
@@ -33,7 +24,6 @@ export default function VerifyEmailContent() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = await createSupabaseClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
